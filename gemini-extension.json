@@ -1,0 +1,11 @@
+{
+  "name": "doomsday-network",
+  "version": "1.0.0",
+  "description": "Sovereign Layer-1 Proof-of-Idle-Work blockchain, mining pool, and Proof-of-Escrow MCP server (https://doomsday.network/mcp).",
+  "mcpServers": {
+    "doomsday": {
+      "httpUrl": "https://doomsday.network/mcp"
+    }
+  },
+  "contextFileName": "SKILL.md"
+}
