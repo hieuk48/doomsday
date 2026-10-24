@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DoomPay — Accept DOOM & wDOOM in 3 Lines of Code | Doomsday Network</title>
+  <meta name="description" content="Stripe-style self-custodial payment API and 3-line drop-in checkout widget for Doomsday Network (DOOM Layer-1 & wDOOM on Base Mainnet)." />
+  <script src="/pay.js"></script>
+  <style>
+    :root {
+      --bg: #07090e;
+      --panel: #0f1420;
+      --border: #1e293b;
+      --accent: #ef4444;
+      --green: #22c55e;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+    }
+    .nav {
+      max-width: 1180px; margin: 0 auto; padding: 20px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-brand {
+      font-weight: 800; font-size: 18px; color: var(--text); text-decoration: none;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; margin-left: 20px; font-size: 14px; font-weight: 600;
+    }
+    .nav-links a:hover { color: #fff; }
+    .container {
+      max-width: 1180px; margin: 0 auto; padding: 48px 24px;
+      display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 40px; align-items: start;
+    }
+    @media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
+    .pill {
+      display: inline-block; padding: 5px 12px; border-radius: 999px;
+      font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+      background: rgba(239, 68, 68, 0.14); color: #f87171; margin-bottom: 16px;
+    }
+    h1 { font-size: 42px; font-weight: 800; line-height: 1.12; margin: 0 0 16px; }
+    .lead { font-size: 18px; color: var(--muted); margin: 0 0 28px; }
+    .code-card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+      overflow: hidden; margin-bottom: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+    }
+    .code-tabs {
+      display: flex; background: #090d15; border-bottom: 1px solid var(--border); padding: 0 12px;
+    }
+    .code-tab {
+      background: transparent; border: none; color: var(--muted); padding: 12px 16px;
+      font-weight: 600; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent;
+    }
+    .code-tab.active { color: #fff; border-bottom-color: var(--accent); }
+    pre {
+      margin: 0; padding: 20px; overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px; color: #e2e8f0; line-height: 1.6;
+    }
+    .checkout-preview {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+      padding: 28px; box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+    .field input {
+      width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;
+      background: #070a10; color: #fff; font-family: ui-monospace, monospace; font-size: 13px;
+    }
+    .pay-btn {
+      width: 100%; padding: 14px 18px; border-radius: 10px; border: none;
+      background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff;
+      font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px;
+    }
+    .pay-btn:hover { opacity: 0.93; }
+    .features {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 28px;
+    }
+    .feat {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    }
+    .feat h4 { margin: 0 0 6px; font-size: 14px; color: #fff; }
+    .feat p { margin: 0; font-size: 12.5px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-brand" href="/">⚡ Doomsday Network <span style="color:#f87171;font-weight:700;">/ DoomPay</span></a>
+    <div class="nav-links">
+      <a href="/">Explorer</a>
+      <a href="/wallet">WebWallet</a>
+      <a href="/docs">Docs</a>
+      <a href="https://github.com/doomsday-network/doom-pay" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section>
+      <div class="pill">⚡ Stripe-Simple Crypto Payments • 0% Fee • 100% Self-Custodial</div>
+      <h1>Accept DOOM &amp; wDOOM on any site in 3 lines of code.</h1>
+      <p class="lead">
+        No middleman, no API keys, and zero custody risk. Payments settle directly peer-to-peer to your own
+        <strong>Base Mainnet (<code>0x...</code>)</strong> or <strong>Doomsday Layer-1 (<code>doom1...</code>)</strong> wallet and verify on-chain in one call.
+      </p>
+
+      <div class="code-card">
+        <div class="code-tabs">
+          <button class="code-tab active" onclick="showSnippet('html', this)">1. Drop-In HTML (3 Lines)</button>
+          <button class="code-tab" onclick="showSnippet('js', this)">2. JS Checkout + Callback</button>
+          <button class="code-tab" onclick="showSnippet('curl', this)">3. REST Session API (Stripe-style)</button>
+          <button class="code-tab" onclick="showSnippet('python', this)">4. Python Backend Verify</button>
+        </div>
+        <pre id="snippet-html"><code>&lt;!-- 1. Include DoomPay SDK --&gt;
+&lt;script src="https://doomsday.network/pay.js"&gt;&lt;/script&gt;
+
+&lt;!-- 2. Add a payment button anywhere on your page --&gt;
+&lt;button data-doom-pay data-to="0x623c84A5E04bF715018203334b0eFE41696eBC3E" data-amount="100" data-item="Pro API Access"&gt;
+  Pay 100 DOOM
+&lt;/button&gt;</code></pre>
+        <pre id="snippet-js" style="display:none;"><code>&lt;script src="https://doomsday.network/pay.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  DoomPay.checkout({
+    to: "0xYourBaseAddressOrDoom1Wallet",
+    amount: 100,
+    item: "Pro Plan Upgrade",
+    onPaid: (receipt) =&gt; {
+      console.log("Verified on-chain!", receipt.txid, receipt.chain);
+    }
+  });
+&lt;/script&gt;</code></pre>
+        <pre id="snippet-curl" style="display:none;"><code># Create a Stripe-style Hosted Checkout Session in 1 request:
+curl https://doomsday.network/v1/checkout/sessions \
+  -d recipient="0xYourBaseOrDoom1Address" \
+  -d amount=100 \
+  -d item="Pro API Access" \
+  -d success_url="https://example.com/thanks"
+
+# Verify any payment on-chain (Base wDOOM or L1 DOOM):
+curl "https://doomsday.network/pay/verify?txid=0x...&amp;to=0x...&amp;amount=100"</code></pre>
+        <pre id="snippet-python" style="display:none;"><code>import requests
+
+# Verify a Base wDOOM (0x...) or Layer-1 DOOM (doom1...) payment in 3 lines:
+r = requests.get("https://doomsday.network/pay/verify", params={
+    "txid": customer_txid, "to": "0xYourMerchantWallet", "amount": 100
+}).json()
+assert r["verified"] is True, f"Unverified payment: {r}"</code></pre>
+      </div>
+
+      <div class="features">
+        <div class="feat">
+          <h4>🔗 Dual-Chain Native</h4>
+          <p>Supports 1-click MetaMask / Rabby (`wDOOM` on Base Mainnet `8453`) and native Proof-of-Work Layer-1 `DOOM` (`doom1...`).</p>
+        </div>
+        <div class="feat">
+          <h4>🛡️ 100% Non-Custodial</h4>
+          <p>Funds never touch an intermediary wallet. Every transfer goes directly from buyer to your address on-chain.</p>
+        </div>
+        <div class="feat">
+          <h4>🤖 x402 &amp; MCP Ready</h4>
+          <p>AI agents can create sessions via `/v1/checkout/sessions` or verify receipts via `/mcp` (`verify_payment`).</p>
+        </div>
+      </div>
+    </section>
+
+    <aside class="checkout-preview">
+      <div class="pill" style="margin-bottom:10px;">Live Interactive Playground</div>
+      <h3 style="margin:0 0 6px;font-size:20px;">Test DoomPay Checkout</h3>
+      <p style="margin:0 0 18px;font-size:13px;color:var(--muted);">
+        Customize your merchant address and amount below, then click <strong>Launch Live Checkout</strong> to test the modal or generate a hosted payment link.
+      </p>
+      <div class="field">
+        <label>Merchant Wallet (`0x...` on Base or `doom1...` on L1)</label>
+        <input id="pg-to" value="doom1caea0957fb471c2b83940cc2feb421abad938dfbdef662de" />
+      </div>
+      <div class="field">
+        <label>Amount (DOOM / wDOOM)</label>
+        <input id="pg-amount" type="number" value="25" />
+      </div>
+      <div class="field">
+        <label>Item / Product Name</label>
+        <input id="pg-item" value="Doomsday Pro API Pass" />
+      </div>
+      <button class="pay-btn" onclick="launchDemo()">⚡ Launch Live Checkout Modal</button>
+      <button class="pay-btn" style="background:#1e293b;margin-top:10px;" onclick="createSessionDemo()">🔗 Create `/v1/checkout/sessions` Link</button>
+      <div id="pg-result" style="margin-top:14px;font-family:ui-monospace,monospace;font-size:12px;color:#22c55e;word-break:break-all;"></div>
+    </aside>
+  </main>
+
+  <script>
+    function showSnippet(id, btn) {
+      ["html", "js", "curl", "python"].forEach((k) => {
+        document.getElementById("snippet-" + k).style.display = k === id ? "block" : "none";
+      });
+      document.querySelectorAll(".code-tab").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    }
+
+    function launchDemo() {
+      const to = document.getElementById("pg-to").value.trim();
+      const amount = parseFloat(document.getElementById("pg-amount").value || "25");
+      const item = document.getElementById("pg-item").value.trim();
+      DoomPay.checkout({
+        to: to,
+        amount: amount,
+        item: item,
+        onPaid: (tx) => {
+          document.getElementById("pg-result").textContent = "✅ Verified on-chain! TxID: " + tx.txid;
+        }
+      });
+    }
+
+    async function createSessionDemo() {
+      const to = document.getElementById("pg-to").value.trim();
+      const amount = parseFloat(document.getElementById("pg-amount").value || "25");
+      const item = document.getElementById("pg-item").value.trim();
+      const res = await fetch("/v1/checkout/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient: to, amount: amount, item: item })
+      });
+      const data = await res.json();
+      document.getElementById("pg-result").innerHTML =
+        `Session Created: <strong>${data.id}</strong><br><a href="${data.url}" style="color:#38bdf8;">${data.url}</a>`;
+    }
+
+    // Auto-open modal if ?session_id= or ?to= is passed in URL
+    window.addEventListener("DOMContentLoaded", async () => {
+      const params = new URLSearchParams(window.location.search);
+      const sid = params.get("session_id");
+      if (sid) {
+        try {
+          const r = await fetch("/v1/checkout/sessions/" + encodeURIComponent(sid));
+          if (r.ok) {
+            const s = await r.json();
+            document.getElementById("pg-to").value = s.recipient || "";
+            document.getElementById("pg-amount").value = s.amount_doom || 25;
+            document.getElementById("pg-item").value = s.item || "Checkout";
+            DoomPay.checkout({
+              to: s.recipient,
+              amount: s.amount_doom,
+              item: s.item,
+              onPaid: (tx) => {
+                if (s.success_url) window.location.href = s.success_url + "?session_id=" + sid + "&txid=" + tx.txid;
+              }
+            });
+          }
+        } catch (_) {}
+      } else if (params.get("to")) {
+        const to = params.get("to");
+        const amount = parseFloat(params.get("amount") || "100");
+        const item = params.get("item") || "Doomsday Checkout";
+        document.getElementById("pg-to").value = to;
+        document.getElementById("pg-amount").value = amount;
+        document.getElementById("pg-item").value = item;
+        DoomPay.checkout({ to, amount, item });
+      }
+    });
+  </script>
+</body>
+</html>

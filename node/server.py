@@ -1244,6 +1244,260 @@ if os.path.exists(web_dir):
     def get_wallet_page():
         return FileResponse(os.path.join(web_dir, "wallet.html"))
 
+    @app.api_route("/pay", methods=["GET", "HEAD"])
+    def get_pay_page():
+        return FileResponse(os.path.join(web_dir, "pay.html"))
+
+    @app.api_route("/pay.js", methods=["GET", "HEAD"])
+    def get_pay_js():
+        return FileResponse(
+            os.path.join(web_dir, "pay.js"),
+            media_type="application/javascript",
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+
+    def _verify_onchain_payment(txid: str = "", to: str = "", amount: float = 0.0, since: int = 0) -> Dict[str, Any]:
+        import urllib.request
+        txid = (txid or "").strip()
+        to = (to or "").strip()
+        req_amt = float(amount or 0.0)
+
+        # 1. Base Mainnet wDOOM (0x... 66-char tx hash)
+        if txid.startswith("0x") and len(txid) == 66:
+            wdoom_contract = "0x623c84a5e04bf715018203334b0efe41696ebc3e"
+            transfer_topic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            rpc_payload = json.dumps({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "eth_getTransactionReceipt",
+                "params": [txid]
+            }).encode("utf-8")
+            try:
+                req = urllib.request.Request(
+                    "https://mainnet.base.org",
+                    data=rpc_payload,
+                    headers={"Content-Type": "application/json", "User-Agent": "DoomPay/1.0"}
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    rpc_res = json.loads(resp.read().decode("utf-8"))
+                receipt = rpc_res.get("result")
+                if not receipt:
+                    return {"verified": False, "error": "Transaction receipt not found on Base Mainnet yet"}
+                if receipt.get("status") != "0x1":
+                    return {"verified": False, "error": "Base transaction reverted"}
+                matched_amount = 0.0
+                matched_from = ""
+                matched_to = ""
+                for lg in receipt.get("logs", []):
+                    if (lg.get("address") or "").lower() != wdoom_contract:
+                        continue
+                    topics = lg.get("topics") or []
+                    if len(topics) >= 3 and topics[0].lower() == transfer_topic:
+                        from_addr = "0x" + topics[1][-40:].lower()
+                        to_addr = "0x" + topics[2][-40:].lower()
+                        val_wei = int(lg.get("data", "0x0"), 16)
+                        val_doom = val_wei / 1e18
+                        if not to or to.lower() == to_addr:
+                            matched_amount += val_doom
+                            matched_from = from_addr
+                            matched_to = to_addr
+                if matched_amount <= 0:
+                    return {"verified": False, "error": "No wDOOM transfer to target recipient found in receipt"}
+                if matched_amount + 1e-9 < req_amt:
+                    return {
+                        "verified": False,
+                        "error": f"Insufficient wDOOM amount: paid {matched_amount}, required {req_amt}",
+                        "amount_doom": matched_amount
+                    }
+                return {
+                    "verified": True,
+                    "chain": "base-mainnet",
+                    "chain_id": 8453,
+                    "ticker": "wDOOM",
+                    "contract": "0x623c84A5E04bF715018203334b0eFE41696eBC3E",
+                    "txid": txid,
+                    "from": matched_from,
+                    "to": matched_to,
+                    "amount_doom": matched_amount,
+                    "confirmed": True,
+                    "confirmations": 1,
+                    "block_height": int(receipt.get("blockNumber", "0x0"), 16),
+                    "explorer_url": f"https://basescan.org/tx/{txid}"
+                }
+            except Exception as e:
+                return {"verified": False, "error": f"Base RPC verification error: {e}"}
+
+        # 2. Layer-1 DOOM by explicit txid
+        if txid:
+            tx, b, confs = chain.get_transaction(txid)
+            if not tx:
+                return {"verified": False, "error": "Layer-1 transaction not found in ledger or mempool"}
+            paid_doom = 0.0
+            matched_to = to
+            for out in tx.outputs:
+                if not to or out.recipient == to:
+                    paid_doom += (out.amount / COIN)
+                    matched_to = out.recipient
+            if paid_doom <= 0 or paid_doom + 1e-9 < req_amt:
+                return {
+                    "verified": False,
+                    "error": f"Output to recipient is {paid_doom} DOOM (required {req_amt} DOOM)",
+                    "amount_doom": paid_doom
+                }
+            return {
+                "verified": True,
+                "chain": "doomsday-l1",
+                "ticker": "DOOM",
+                "txid": tx.txid,
+                "to": matched_to,
+                "amount_doom": paid_doom,
+                "confirmed": b is not None,
+                "confirmations": confs,
+                "block_height": b.height if b else None,
+                "explorer_url": "https://doomsday.network"
+            }
+
+        # 3. Auto-detect recent Layer-1 DOOM payment to `to` address since timestamp
+        if to.startswith("doom1"):
+            cutoff = int(since) if since else int(time.time()) - 3600
+            for tx in list(chain.mempool.values()):
+                paid = sum(o.amount / COIN for o in tx.outputs if o.recipient == to)
+                if paid > 0 and paid + 1e-9 >= req_amt:
+                    return {
+                        "verified": True,
+                        "chain": "doomsday-l1",
+                        "ticker": "DOOM",
+                        "txid": tx.txid,
+                        "to": to,
+                        "amount_doom": paid,
+                        "confirmed": False,
+                        "confirmations": 0,
+                        "block_height": None,
+                        "explorer_url": "https://doomsday.network"
+                    }
+            tip_h = len(chain.blocks) - 1
+            for b in reversed(chain.blocks[-120:]):
+                if b.header.timestamp < cutoff:
+                    break
+                for tx in b.transactions:
+                    if tx.is_coinbase:
+                        continue
+                    paid = sum(o.amount / COIN for o in tx.outputs if o.recipient == to)
+                    if paid > 0 and paid + 1e-9 >= req_amt:
+                        return {
+                            "verified": True,
+                            "chain": "doomsday-l1",
+                            "ticker": "DOOM",
+                            "txid": tx.txid,
+                            "to": to,
+                            "amount_doom": paid,
+                            "confirmed": True,
+                            "confirmations": max(1, tip_h - b.height + 1),
+                            "block_height": b.height,
+                            "explorer_url": "https://doomsday.network"
+                        }
+            return {"verified": False, "error": "No matching Layer-1 payment detected yet"}
+
+        return {"verified": False, "error": "Provide txid (0x... or L1 hex) or a doom1... recipient address"}
+
+    @app.api_route("/pay/verify", methods=["GET", "POST"])
+    async def verify_payment_endpoint(
+        request: Request,
+        txid: str = "",
+        to: str = "",
+        amount: float = 0.0,
+        since: int = 0
+    ):
+        if request.method == "POST":
+            try:
+                body = await request.json()
+                txid = body.get("txid", txid)
+                to = body.get("to") or body.get("recipient") or to
+                amount = float(body.get("amount", amount) or 0.0)
+                since = int(body.get("since", since) or 0)
+            except Exception:
+                pass
+        return _verify_onchain_payment(txid=txid, to=to, amount=amount, since=since)
+
+    checkout_sessions: Dict[str, Dict[str, Any]] = {}
+
+    @app.post("/v1/checkout/sessions")
+    async def create_checkout_session(request: Request):
+        """Stripe-style self-custodial Checkout Session creation (supports JSON or form-urlencoded)."""
+        import secrets
+        from urllib.parse import parse_qs
+        data: Dict[str, Any] = {}
+        ctype = (request.headers.get("content-type") or "").lower()
+        raw_bytes = await request.body()
+        if "application/json" in ctype:
+            try:
+                data = json.loads(raw_bytes.decode("utf-8"))
+            except Exception:
+                data = {}
+        else:
+            parsed = parse_qs(raw_bytes.decode("utf-8", errors="replace"))
+            data = {k: v[0] for k, v in parsed.items() if v}
+
+        recipient = str(data.get("recipient") or data.get("to") or "").strip()
+        if not recipient or not (recipient.startswith("0x") or recipient.startswith("doom1")):
+            raise HTTPException(status_code=400, detail="Valid 'recipient' (0x... Base address or doom1... L1 address) is required")
+        try:
+            amount_doom = float(data.get("amount") or data.get("amount_doom") or 100.0)
+        except Exception:
+            amount_doom = 100.0
+        item = str(data.get("item") or data.get("name") or "Doomsday Checkout").strip()
+        success_url = str(data.get("success_url") or "").strip()
+        cancel_url = str(data.get("cancel_url") or "").strip()
+        webhook_url = str(data.get("webhook_url") or "").strip()
+
+        sid = "cs_live_" + secrets.token_hex(12)
+        now_ts = int(time.time())
+        session_obj = {
+            "id": sid,
+            "object": "checkout.session",
+            "status": "open",
+            "payment_status": "unpaid",
+            "recipient": recipient,
+            "amount_doom": amount_doom,
+            "currency": "wDOOM" if recipient.startswith("0x") else "DOOM",
+            "item": item,
+            "url": f"https://doomsday.network/pay?session_id={sid}",
+            "verify_url": f"https://doomsday.network/v1/checkout/sessions/{sid}",
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "webhook_url": webhook_url,
+            "txid": None,
+            "created": now_ts,
+        }
+        checkout_sessions[sid] = session_obj
+        return session_obj
+
+    @app.api_route("/v1/checkout/sessions/{session_id}", methods=["GET", "POST"])
+    async def get_or_verify_checkout_session(session_id: str, request: Request, txid: str = ""):
+        if session_id not in checkout_sessions:
+            raise HTTPException(status_code=404, detail="Checkout session not found")
+        sess = checkout_sessions[session_id]
+        if request.method == "POST" and not txid:
+            try:
+                body = await request.json()
+                txid = str(body.get("txid") or "")
+            except Exception:
+                pass
+        if sess["payment_status"] != "paid":
+            v = _verify_onchain_payment(
+                txid=txid or (sess.get("txid") or ""),
+                to=sess["recipient"],
+                amount=sess["amount_doom"],
+                since=sess["created"] - 30
+            )
+            if v.get("verified"):
+                sess["status"] = "complete"
+                sess["payment_status"] = "paid"
+                sess["txid"] = v.get("txid")
+                sess["chain"] = v.get("chain")
+                sess["block_height"] = v.get("block_height")
+        return sess
+
     @app.api_route("/install.sh", methods=["GET", "HEAD"])
     def get_install_script():
         script_path = os.path.join(web_dir, "install.sh")
@@ -1363,6 +1617,19 @@ if os.path.exists(web_dir):
                 "inputSchema": {"type": "object", "properties": {}},
                 "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True},
             },
+            {
+                "name": "verify_payment",
+                "description": "Verify an on-chain DOOM (Layer-1) or wDOOM (Base Mainnet ERC-20) payment receipt for a merchant address and amount.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "txid": {"type": "string", "description": "Base Mainnet 0x... tx hash or Doomsday L1 64-hex txid"},
+                        "to": {"type": "string", "description": "Merchant 0x... or doom1... recipient address"},
+                        "amount": {"type": "number", "description": "Minimum expected DOOM / wDOOM amount"},
+                    },
+                },
+                "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True},
+            },
         ]
         if request.method == "GET":
             return {
@@ -1403,6 +1670,12 @@ if os.path.exists(web_dir):
                     payload = {"error": "Expected owner/repo#number"}
             elif tname == "get_pool_leaderboard":
                 payload = {"leaders": pool.get_leaderboard()}
+            elif tname == "verify_payment":
+                payload = _verify_onchain_payment(
+                    txid=str(targs.get("txid", "")),
+                    to=str(targs.get("to", "")),
+                    amount=float(targs.get("amount", 0.0) or 0.0),
+                )
             else:
                 payload = {"error": f"Unknown tool: {tname}"}
             res = {"content": [{"type": "text", "text": json.dumps(payload, indent=2)}]}
@@ -1415,6 +1688,8 @@ if os.path.exists(web_dir):
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://doomsday.network/</loc><changefreq>always</changefreq><priority>1.0</priority></url>
+  <url><loc>https://doomsday.network/pay</loc><changefreq>daily</changefreq><priority>0.95</priority></url>
+  <url><loc>https://doomsday.network/pay.js</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
   <url><loc>https://doomsday.network/wallet</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
   <url><loc>https://doomsday.network/docs</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
   <url><loc>https://doomsday.network/bridge/audit</loc><changefreq>always</changefreq><priority>0.8</priority></url>
