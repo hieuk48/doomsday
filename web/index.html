@@ -520,6 +520,37 @@
       </div>
     </div>
 
+    <!-- DOOMVAULT STEAM GIFT CARD STOREFRONT BANNER -->
+    <div style="margin-bottom: 24px; padding: 18px 22px; border-radius: 12px; border: 1px solid rgba(0, 255, 136, 0.35); background: linear-gradient(135deg, rgba(0, 255, 136, 0.08) 0%, rgba(15, 23, 42, 0.9) 100%); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+      <div style="flex: 1; min-width: 280px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px;">
+          <span style="background: rgba(0, 255, 136, 0.16); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.4); font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px;">🟢 10 / 10 AVAILABLE ($100 USD VAULT)</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);">POWERED BY DOOMPAY • 1 PER MINER</span>
+        </div>
+        <div style="font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 4px;">
+          🎮 DoomVault: Redeem <span style="color: #00ff88;">100,000 DOOM</span> (or <span style="color: #00ff88;">wDOOM</span>) for a <span style="color: var(--accent);">$10.00 Steam Digital Gift Card</span>
+        </div>
+        <div style="font-size: 13px; color: var(--text-muted);">
+          Mine DOOM while your gaming PC is idle (or top up on Uniswap Base Mainnet) and exchange <strong style="color: #fff;">100,000 DOOM</strong> directly on-chain for a $10 USD Steam Gift Card code.
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <button
+          type="button"
+          data-doom-pay
+          data-to="0x484ed370ded0d36e36aad469a2afe5d69b1a005d"
+          data-doom-to="doom12da148685b855223a3cd830058e227d8369b5aac8e96db05"
+          data-amount="100000"
+          data-item="$10 Steam Digital Gift Card (DoomVault)"
+          style="background: #00ff88; color: #05080f; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);">
+          💳 Redeem 100,000 DOOM ($10 Steam Card)
+        </button>
+        <a href="https://github.com/doomsday-network/doomsday/issues/39" target="_blank" style="text-decoration: none; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: #fff; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(0,0,0,0.45);">
+          📋 View Redemption Thread (#39) &rarr;
+        </a>
+      </div>
+    </div>
+
     <!-- METRICS -->
     <div class="metrics-grid">
       <div class="metric-card">
@@ -1994,5 +2025,6 @@
     setInterval(fetchDexMarket, 15000);
     setInterval(updateEarningsCalculator, 5000);
   </script>
+  <script src="/pay.js"></script>
 </body>
 </html>
