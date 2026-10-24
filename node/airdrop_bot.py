@@ -68,6 +68,7 @@ IGNORED_EVM_ADDRESSES = {
     "0xf7217329574249d7b389404aecf2c582662f3659",
     "0x000000000000000000000000000000000000dead",
     "0x0000000000000000000000000000000000000000",
+    "0x0000ffff00000000000000000000000000000000",
     "0x4200000000000000000000000000000000000006",
     "0x484ed370ded0d36e36aad469a2afe5d69b1a005d",
     # Known LLM documentation example placeholder addresses:
@@ -456,6 +457,10 @@ def poll_once(gh_token: str) -> None:
                         state.setdefault("paid_wallets", []).append(target_wallet.lower())
                         state.setdefault("paid_issue_users", []).append(f"{repo}#{issue_num}:{target_user.lower()}")
                         state["paid_issue_users"].append(f"{repo}#{issue_num}:{target_wallet.lower()}")
+                        for d_cand in DOOM_REGEX.findall(body):
+                            if d_cand.lower() not in IGNORED_DOOM_ADDRESSES:
+                                state["paid_issue_users"].append(f"pool_miner:{d_cand.lower()}")
+                                state["paid_issue_users"].append(f"{repo}#{issue_num}:{d_cand.lower()}")
                         _record_escrow_settlement(f"{repo}#{issue_num}", target_user, target_wallet, pay_amt, txid)
                         _save_state(state)
                         if gh_token:
