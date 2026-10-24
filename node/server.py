@@ -1360,7 +1360,8 @@ if os.path.exists(web_dir):
         # 3. Auto-detect recent Layer-1 DOOM payment to `to` address since timestamp
         if to.startswith("doom1"):
             cutoff = int(since) if since else int(time.time()) - 3600
-            for tx in list(chain.mempool.values()):
+            mempool_txs = list(chain.mempool.values()) if isinstance(chain.mempool, dict) else list(chain.mempool)
+            for tx in mempool_txs:
                 paid = sum(o.amount / COIN for o in tx.outputs if o.recipient == to)
                 if paid > 0 and paid + 1e-9 >= req_amt:
                     return {
