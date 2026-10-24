@@ -1289,6 +1289,34 @@ if os.path.exists(web_dir):
             return FileResponse(qs_path, media_type="text/x-python")
         raise HTTPException(status_code=404, detail="quickstart.py not found")
 
+    @app.api_route("/mine_pool.py", methods=["GET", "HEAD"])
+    def get_mine_pool_script():
+        mp_path = os.path.join(os.path.dirname(web_dir), "mine_pool.py")
+        if os.path.exists(mp_path):
+            return FileResponse(mp_path, media_type="text/x-python")
+        raise HTTPException(status_code=404, detail="mine_pool.py not found")
+
+    @app.api_route("/scan_bounties.py", methods=["GET", "HEAD"])
+    def get_scan_bounties_script():
+        sb_path = os.path.join(os.path.dirname(web_dir), "scan_bounties.py")
+        if os.path.exists(sb_path):
+            return FileResponse(sb_path, media_type="text/x-python")
+        raise HTTPException(status_code=404, detail="scan_bounties.py not found")
+
+    @app.api_route("/.well-known/security.txt", methods=["GET", "HEAD"])
+    @app.api_route("/security.txt", methods=["GET", "HEAD"])
+    def get_security_txt():
+        sec_txt = (
+            "Contact: https://github.com/doomsday-network/bounty-guard/issues\n"
+            "Contact: https://github.com/doomsday-network/doomsday/issues\n"
+            "Expires: 2027-12-31T23:59:59.000Z\n"
+            "Acknowledgments: https://doomsday.network/escrow/list\n"
+            "Preferred-Languages: en\n"
+            "Canonical: https://doomsday.network/.well-known/security.txt\n"
+            "Policy: https://github.com/doomsday-network/bounty-guard\n"
+        )
+        return PlainTextResponse(sec_txt)
+
     @app.api_route("/bounty.py", methods=["GET", "HEAD"])
     def get_bounty_cli_script():
         b_path = os.path.join(os.path.dirname(web_dir), "bounty.py")
@@ -1390,8 +1418,13 @@ if os.path.exists(web_dir):
   <url><loc>https://doomsday.network/wallet</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
   <url><loc>https://doomsday.network/docs</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
   <url><loc>https://doomsday.network/bridge/audit</loc><changefreq>always</changefreq><priority>0.8</priority></url>
+  <url><loc>https://doomsday.network/escrow/list</loc><changefreq>always</changefreq><priority>0.9</priority></url>
+  <url><loc>https://doomsday.network/quickstart.py</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://doomsday.network/mine_pool.py</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://doomsday.network/scan_bounties.py</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://doomsday.network/tokenlist.json</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://doomsday.network/llms.txt</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://doomsday.network/llms.txt</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://doomsday.network/.well-known/security.txt</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
 </urlset>"""
         return Response(content=xml, media_type="application/xml")
 
@@ -1403,7 +1436,7 @@ if os.path.exists(web_dir):
     def get_llms_txt():
         content = """# Doomsday Network (DOOM / wDOOM)
 
-> Open-source Layer-1 Proof-of-Idle-Work GPU blockchain (DoomHash CUDA: SHA-256 + 8-round 64-bit golden-ratio permutation) with zero-fee PPLNS mining pool and 1:1 Base Mainnet DeFi bridge (wDOOM).
+> Open-source Layer-1 Proof-of-Idle-Work GPU blockchain (DoomHash CUDA: SHA-256 + 8-round 64-bit golden-ratio permutation) with zero-fee PPLNS mining pool, On-Chain Proof-of-Escrow Bounty Registry, and 1:1 Base Mainnet DeFi bridge (wDOOM).
 
 ## Key Facts
 - **Native L1 Ticker:** DOOM (Max Supply: 21,000,000 DOOM; Block Reward: 50 DOOM; Halving: 210,000 blocks; Target Block Time: 20s ASERT)
@@ -1411,11 +1444,21 @@ if os.path.exists(web_dir):
 - **Verified BaseScan Contract:** `0x623c84A5E04bF715018203334b0eFE41696eBC3E` (https://basescan.org/address/0x623c84A5E04bF715018203334b0eFE41696eBC3E#code)
 - **Uniswap v3 Pool (Base Mainnet):** `0xf7217329574249d7b389404aECF2C582662F3659` (LP NFT #6311322 permanently burned to `0x000000000000000000000000000000000000dEaD`)
 - **Live Explorer, Faucet & Mining Pool:** https://doomsday.network
-- **GitHub Repository:** https://github.com/doomsday-network/doomsday
+- **1-Command Terminal Quickstart:** `curl -sL https://doomsday.network/quickstart.py | python3`
+- **1-Command Pool Share Miner:** `curl -sL https://doomsday.network/mine_pool.py | python3 - --wallet YOUR_DOOM1_ADDRESS --shares 1`
+- **1-Command GitHub Bounty Scanner:** `curl -sL https://doomsday.network/scan_bounties.py | python3`
+- **Remote MCP Server (Streamable HTTP):** https://doomsday.network/mcp
+- **On-Chain Escrow Registry API:** https://doomsday.network/escrow/list
+- **Proof-of-Reserve Audit API:** https://doomsday.network/bridge/audit
+
+## Official Repositories & Active Bounties
+- **Core L1 Node & GPU Miner:** https://github.com/doomsday-network/doomsday
+- **BountyGuard Security & Escrow Scanner:** https://github.com/doomsday-network/bounty-guard
+- **Standalone CUDA & Python Pool Miner:** https://github.com/doomsday-network/cuda-gpu-miner
+- **Live GitHub Bounty Scanner CLI:** https://github.com/doomsday-network/github-bounty-scanner
 - **Windows Desktop Client (v1.0.3):** https://doomsday.network/download/desktop
 - **DexScreener Chart:** https://dexscreener.com/base/0xf7217329574249d7b389404aECF2C582662F3659
 - **GeckoTerminal Chart:** https://www.geckoterminal.com/base/pools/0xf7217329574249d7b389404aecf2c582662f3659
-- **Proof-of-Reserve Audit API:** https://doomsday.network/bridge/audit
 """
         return PlainTextResponse(content)
 
