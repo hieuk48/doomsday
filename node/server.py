@@ -1359,44 +1359,49 @@ if os.path.exists(web_dir):
 
         # 3. Auto-detect recent Layer-1 DOOM payment to `to` address since timestamp
         if to.startswith("doom1"):
-            cutoff = int(since) if since else int(time.time()) - 3600
-            mempool_txs = list(chain.mempool.values()) if isinstance(chain.mempool, dict) else list(chain.mempool)
-            for tx in mempool_txs:
-                paid = sum(o.amount / COIN for o in tx.outputs if o.recipient == to)
-                if paid > 0 and paid + 1e-9 >= req_amt:
-                    return {
-                        "verified": True,
-                        "chain": "doomsday-l1",
-                        "ticker": "DOOM",
-                        "txid": tx.txid,
-                        "to": to,
-                        "amount_doom": paid,
-                        "confirmed": False,
-                        "confirmations": 0,
-                        "block_height": None,
-                        "explorer_url": "https://doomsday.network"
-                    }
-            tip_h = len(chain.blocks) - 1
-            for b in reversed(chain.blocks[-120:]):
-                if b.header.timestamp < cutoff:
-                    break
-                for tx in b.transactions:
-                    if tx.is_coinbase:
-                        continue
-                    paid = sum(o.amount / COIN for o in tx.outputs if o.recipient == to)
+            try:
+                cutoff = int(since) if since else int(time.time()) - 3600
+                mempool_txs = list(chain.mempool.values()) if isinstance(chain.mempool, dict) else list(chain.mempool)
+                for tx in mempool_txs:
+                    outputs = getattr(tx, "outputs", None) or (tx.get("outputs", []) if isinstance(tx, dict) else [])
+                    paid = sum((getattr(o, "amount", 0) if not isinstance(o, dict) else o.get("amount", 0)) / COIN for o in outputs if (getattr(o, "recipient", "") if not isinstance(o, dict) else o.get("recipient", "")) == to)
                     if paid > 0 and paid + 1e-9 >= req_amt:
+                        txid_val = getattr(tx, "txid", None) or (tx.get("txid") if isinstance(tx, dict) else "")
                         return {
                             "verified": True,
                             "chain": "doomsday-l1",
                             "ticker": "DOOM",
-                            "txid": tx.txid,
+                            "txid": txid_val,
                             "to": to,
                             "amount_doom": paid,
-                            "confirmed": True,
-                            "confirmations": max(1, tip_h - b.height + 1),
-                            "block_height": b.height,
+                            "confirmed": False,
+                            "confirmations": 0,
+                            "block_height": None,
                             "explorer_url": "https://doomsday.network"
                         }
+                tip_h = len(chain.blocks) - 1
+                for b in reversed(chain.blocks[-120:]):
+                    if b.header.timestamp < cutoff:
+                        break
+                    for tx in b.transactions:
+                        if getattr(tx, "is_coinbase", False):
+                            continue
+                        paid = sum(o.amount / COIN for o in tx.outputs if o.recipient == to)
+                        if paid > 0 and paid + 1e-9 >= req_amt:
+                            return {
+                                "verified": True,
+                                "chain": "doomsday-l1",
+                                "ticker": "DOOM",
+                                "txid": tx.txid,
+                                "to": to,
+                                "amount_doom": paid,
+                                "confirmed": True,
+                                "confirmations": max(1, tip_h - b.height + 1),
+                                "block_height": b.height,
+                                "explorer_url": "https://doomsday.network"
+                            }
+            except Exception as e:
+                return {"verified": False, "error": f"L1 scan error: {e}"}
             return {"verified": False, "error": "No matching Layer-1 payment detected yet"}
 
         return {"verified": False, "error": "Provide txid (0x... or L1 hex) or a doom1... recipient address"}
