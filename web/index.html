@@ -1805,7 +1805,27 @@
       try {
         const res = await fetch('https://api.dexscreener.com/latest/dex/pairs/base/0xf7217329574249d7b389404aECF2C582662F3659');
         const data = await res.json();
-        const pair = (data.pairs && data.pairs[0]) || data.pair;
+        let pair = (data.pairs && data.pairs[0]) || data.pair;
+        if (!pair) {
+          const gtRes = await fetch('https://api.geckoterminal.com/api/v2/networks/base/pools/0xf7217329574249d7b389404aecf2c582662f3659', {
+            headers: { 'Accept': 'application/json' }
+          });
+          const gtData = await gtRes.json();
+          const attrs = (gtData.data && gtData.data.attributes) || null;
+          if (attrs && attrs.base_token_price_usd) {
+            pair = {
+              priceUsd: parseFloat(attrs.base_token_price_usd).toFixed(8),
+              priceChange: { h24: attrs.price_change_percentage ? attrs.price_change_percentage.h24 : 0 },
+              liquidity: { usd: attrs.reserve_in_usd || 0 },
+              txns: {
+                h24: {
+                  buys: attrs.transactions && attrs.transactions.h24 ? attrs.transactions.h24.buys : 0,
+                  sells: attrs.transactions && attrs.transactions.h24 ? attrs.transactions.h24.sells : 0
+                }
+              }
+            };
+          }
+        }
         if (!pair) return;
         const priceEl = document.getElementById('dex-price-badge');
         const changeEl = document.getElementById('dex-change-badge');
@@ -1813,7 +1833,7 @@
           liveDexPriceUsd = parseFloat(pair.priceUsd) || liveDexPriceUsd;
           if (priceEl) priceEl.innerText = `$${pair.priceUsd} USD`;
           const marketSubEl = document.getElementById('val-market-sub');
-          if (marketSubEl) marketSubEl.innerHTML = `wDOOM: <span style="color: var(--green); font-weight: 700;">$${escapeHtml(pair.priceUsd)}</span> • ASERT (20s)`;
+          if (marketSubEl) marketSubEl.innerHTML = `wDOOM: <span style="color: var(--green); font-weight: 700;">$${escapeHtml(String(pair.priceUsd))}</span> • ASERT (20s)`;
         }
         if (changeEl) {
           const chg = pair.priceChange && pair.priceChange.h24 !== undefined ? Number(pair.priceChange.h24) : 0;
