@@ -192,17 +192,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    btnToggleForce.addEventListener('click', async () => {
+    btnToggleForce.onclick = async () => {
       btnToggleForce.disabled = true;
       try {
         const isForce = await window.doomsdayAPI.toggleForceMine();
+        config.force_mine = isForce;
         updateForceButtonUI(isForce);
       } catch (e) {
         console.error(e);
       } finally {
         btnToggleForce.disabled = false;
       }
-    });
+    };
 
     // Schedule Modal Setup
     const modalSchedule = document.getElementById('modal-schedule');
@@ -234,16 +235,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    btnOpenSched.addEventListener('click', () => {
+    btnOpenSched.onclick = () => {
       syncScheduleInputs();
       modalSchedule.style.display = 'flex';
-    });
+    };
 
     const hideSchedModal = () => { modalSchedule.style.display = 'none'; };
-    btnCloseSched.addEventListener('click', hideSchedModal);
-    btnCloseSchedX.addEventListener('click', hideSchedModal);
+    btnCloseSched.onclick = hideSchedModal;
+    btnCloseSchedX.onclick = hideSchedModal;
 
-    btnSaveSched.addEventListener('click', async () => {
+    btnSaveSched.onclick = async () => {
       config.schedule_enabled = schedEnable.checked;
       config.schedule_start = schedStart.value;
       config.schedule_end = schedEnd.value;
@@ -256,7 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       updateScheduleBadge();
       hideSchedModal();
-    });
+    };
 
     updateForceButtonUI(!!config.force_mine);
     updateScheduleBadge();

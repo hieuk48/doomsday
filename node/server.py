@@ -1257,13 +1257,6 @@ if os.path.exists(web_dir):
     @app.api_route("/download/Doomsday-v1.0.1-windows-x64.zip", methods=["GET", "HEAD"])
     @app.api_route("/download/Doomsday-v1.0.0-windows-x64.zip", methods=["GET", "HEAD"])
     def download_windows_miner():
-        candidates = [
-            os.path.join(web_dir, "Doomsday-v1.0.0-Windows-x64.zip"),
-            os.path.join(os.path.dirname(os.path.dirname(__file__)), "desktop", "dist", "Doomsday-Windows-x64.zip")
-        ]
-        for p in candidates:
-            if os.path.exists(p):
-                return FileResponse(p, filename="Doomsday-Windows-x64.zip", media_type="application/zip")
         return RedirectResponse(
             url="https://github.com/doomsday-network/doomsday/releases/latest/download/Doomsday-Windows-x64.zip",
             status_code=302

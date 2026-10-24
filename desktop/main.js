@@ -366,8 +366,8 @@ function updateTrayMenu() {
   tray.setContextMenu(contextMenu);
 }
 
-function startMinerChildProcess(cfg) {
-  if (minerProcess && (minerStatus.state === 'MINING' || minerStatus.state === 'FORCE_MINING' || minerStatus.state === 'STANDBY' || minerStatus.state === 'SCHEDULE_STANDBY' || minerStatus.state === 'VIGIL')) {
+function startMinerChildProcess(cfg, forceRestart = false) {
+  if (!forceRestart && minerProcess && (minerStatus.state === 'MINING' || minerStatus.state === 'FORCE_MINING' || minerStatus.state === 'STANDBY' || minerStatus.state === 'SCHEDULE_STANDBY' || minerStatus.state === 'VIGIL')) {
     return;
   }
   stopMinerChildProcess();
@@ -389,9 +389,7 @@ function startMinerChildProcess(cfg) {
 
   if (cfg.force_mine) {
     args.push('--continuous');
-  }
-
-  if (cfg.schedule_enabled && cfg.schedule_start && cfg.schedule_end) {
+  } else if (cfg.schedule_enabled && cfg.schedule_start && cfg.schedule_end) {
     args.push('--schedule-start', cfg.schedule_start);
     args.push('--schedule-end', cfg.schedule_end);
     if (cfg.schedule_behavior === 'force') {
@@ -401,10 +399,12 @@ function startMinerChildProcess(cfg) {
 
   console.log('[Desktop] Spawning miner sentinel:', pythonCmd, args.join(' '));
 
-  minerProcess = spawn(pythonCmd, args, {
+  const proc = spawn(pythonCmd, args, {
     cwd: projectDir,
+    windowsHide: true,
     env: Object.assign({}, process.env, { PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' })
   });
+  minerProcess = proc;
 
   if (cfg.cpu_comining) {
     const cpuArgs = [
@@ -420,8 +420,7 @@ function startMinerChildProcess(cfg) {
     ];
     if (cfg.force_mine) {
       cpuArgs.push('--continuous');
-    }
-    if (cfg.schedule_enabled && cfg.schedule_start && cfg.schedule_end) {
+    } else if (cfg.schedule_enabled && cfg.schedule_start && cfg.schedule_end) {
       cpuArgs.push('--schedule-start', cfg.schedule_start);
       cpuArgs.push('--schedule-end', cfg.schedule_end);
       if (cfg.schedule_behavior === 'force') {
@@ -429,39 +428,47 @@ function startMinerChildProcess(cfg) {
       }
     }
     console.log('[Desktop] Spawning Hybrid CPU Co-Miner:', pythonCmd, cpuArgs.join(' '));
-    cpuMinerProcess = spawn(pythonCmd, cpuArgs, {
+    const cpuProc = spawn(pythonCmd, cpuArgs, {
       cwd: projectDir,
+      windowsHide: true,
       env: Object.assign({}, process.env, { PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' })
     });
-    cpuMinerProcess.stdout.on('data', (data) => {
+    cpuMinerProcess = cpuProc;
+    cpuProc.stdout.on('data', (data) => {
+      if (cpuMinerProcess !== cpuProc) return;
       const text = data.toString();
       const mhsMatch = text.match(/Speed:\s*([\d\.]+)\s*MH\/s/i);
       if (text.includes('[FORCE MINING]') || text.includes('[MINING]')) {
         if (mhsMatch) cpuHashrateMhs = parseFloat(mhsMatch[1]);
-      } else if (text.includes('[Schedule Inactive]') || text.includes('[User Active]')) {
+      } else if (text.includes('[Schedule Inactive]') || text.includes('[User Active]') || text.includes('[Workload Active')) {
         cpuHashrateMhs = 0.0;
       }
       updateTrayMenu();
       broadcastMinerUpdate();
     });
-    cpuMinerProcess.on('close', () => {
+    cpuProc.on('close', () => {
+      if (cpuMinerProcess !== cpuProc) return;
       cpuHashrateMhs = 0.0;
     });
   }
 
   minerStatus.state = cfg.force_mine ? 'FORCE_MINING' : 'VIGIL';
   updateTrayMenu();
+  broadcastMinerUpdate();
 
-  minerProcess.stdout.on('data', (data) => {
+  proc.stdout.on('data', (data) => {
+    if (minerProcess !== proc) return;
     const text = data.toString();
     parseMinerOutput(text);
   });
 
-  minerProcess.stderr.on('data', (data) => {
+  proc.stderr.on('data', (data) => {
+    if (minerProcess !== proc) return;
     console.error('[Miner STDERR]', data.toString());
   });
 
-  minerProcess.on('error', (err) => {
+  proc.on('error', (err) => {
+    if (minerProcess !== proc) return;
     console.error('[Desktop] Failed to spawn miner process:', err);
     minerStatus.state = 'STOPPED';
     updateTrayMenu();
@@ -473,7 +480,8 @@ function startMinerChildProcess(cfg) {
     }
   });
 
-  minerProcess.on('close', (code) => {
+  proc.on('close', (code) => {
+    if (minerProcess !== proc) return;
     console.log('[Desktop] Miner process exited with code', code);
     minerStatus.state = 'STOPPED';
     updateTrayMenu();
@@ -501,7 +509,7 @@ function parseMinerOutput(text) {
     minerStatus.state = 'SCHEDULE_STANDBY';
     minerStatus.hashrate_mhs = 0.0;
     updatePowerSave(false);
-  } else if (text.includes('[User Active]')) {
+  } else if (text.includes('[User Active]') || text.includes('[Workload Active')) {
     minerStatus.state = 'STANDBY';
     minerStatus.hashrate_mhs = 0.0;
     updatePowerSave(false);
@@ -548,19 +556,33 @@ function broadcastMinerUpdate() {
 
 function stopMinerChildProcess() {
   updatePowerSave(false);
-  if (minerProcess) {
+  const oldProc = minerProcess;
+  minerProcess = null;
+  if (oldProc) {
     try {
-      minerProcess.kill('SIGINT');
-      minerProcess.kill('SIGTERM');
-    } catch (e) {}
-    minerProcess = null;
+      if (process.platform === 'win32' && oldProc.pid) {
+        execSync(`taskkill /F /T /PID ${oldProc.pid}`, { stdio: 'ignore', windowsHide: true });
+      } else {
+        oldProc.kill('SIGINT');
+        oldProc.kill('SIGTERM');
+      }
+    } catch (e) {
+      try { oldProc.kill(); } catch (_) {}
+    }
   }
-  if (cpuMinerProcess) {
+  const oldCpuProc = cpuMinerProcess;
+  cpuMinerProcess = null;
+  if (oldCpuProc) {
     try {
-      cpuMinerProcess.kill('SIGINT');
-      cpuMinerProcess.kill('SIGTERM');
-    } catch (e) {}
-    cpuMinerProcess = null;
+      if (process.platform === 'win32' && oldCpuProc.pid) {
+        execSync(`taskkill /F /T /PID ${oldCpuProc.pid}`, { stdio: 'ignore', windowsHide: true });
+      } else {
+        oldCpuProc.kill('SIGINT');
+        oldCpuProc.kill('SIGTERM');
+      }
+    } catch (e) {
+      try { oldCpuProc.kill(); } catch (_) {}
+    }
   }
   cpuHashrateMhs = 0.0;
   minerStatus.state = 'STOPPED';
@@ -666,7 +688,13 @@ ipcMain.handle('save-wallet-backup', (_event, walletData) => {
 });
 
 ipcMain.handle('load-config', () => loadConfig());
-ipcMain.handle('save-config', (_event, cfg) => saveConfig(cfg));
+ipcMain.handle('save-config', (_event, cfg) => {
+  const ok = saveConfig(cfg);
+  if (minerProcess) {
+    startMinerChildProcess(cfg, true);
+  }
+  return ok;
+});
 ipcMain.handle('start-miner', (_event, cfg) => {
   saveConfig(cfg);
   startMinerChildProcess(cfg);
@@ -693,11 +721,15 @@ ipcMain.handle('open-external', (_event, url) => {
 });
 
 ipcMain.handle('toggle-force-mine', () => {
+  if (pauseTimeout) {
+    clearTimeout(pauseTimeout);
+    pauseTimeout = null;
+  }
   const cfg = loadConfig();
   cfg.force_mine = !cfg.force_mine;
   saveConfig(cfg);
-  stopMinerChildProcess();
-  startMinerChildProcess(cfg);
+  startMinerChildProcess(cfg, true);
+  updateTrayMenu();
   broadcastMinerUpdate();
   return cfg.force_mine;
 });
