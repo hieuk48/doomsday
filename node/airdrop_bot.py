@@ -41,6 +41,7 @@ WATCHED_ISSUES = [
     ("doomsday-network/bounty-guard", 7, 2000.0),
     ("doomsday-network/cuda-gpu-miner", 1, 1000.0),
     ("doomsday-network/github-bounty-scanner", 1, 1000.0),
+    ("doomsday-network/web3-agent-skills", 1, 1000.0),
 ]
 
 # Issues that MUST NOT auto-pay without explicit maintainer `/doom-pay` verification
@@ -55,6 +56,7 @@ MANUAL_REVIEW_REQUIRED_ISSUES = {
     ("doomsday-network/bounty-guard", 7),
     ("doomsday-network/cuda-gpu-miner", 1),
     ("doomsday-network/github-bounty-scanner", 1),
+    ("doomsday-network/web3-agent-skills", 1),
 }
 
 DOOM_REGEX = re.compile(r"\b(doom1[a-fA-F0-9]{48})\b")
