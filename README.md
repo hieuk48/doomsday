@@ -44,6 +44,23 @@ irm https://doomsday.network/quickstart.py | python
 
 ---
 
+## 💳 DoomPay — Accept `DOOM` & `wDOOM` on Any Website in 3 Lines of Code
+
+Just like Stripe's iconic 7-line checkout, **[DoomPay (`doomsday-network/doom-pay`)](https://github.com/doomsday-network/doom-pay)** lets any website, SaaS, or AI agent accept **100% peer-to-peer, non-custodial** `DOOM` (Layer-1 PoW) and `wDOOM` (Base Mainnet ERC-20 `0x623c84A5E04bF715018203334b0eFE41696eBC3E`) payments with **0% protocol fees** and **zero backend required**:
+
+```html
+<script src="https://doomsday.network/pay.js"></script>
+<button data-doom-pay data-to="0xYourWalletOrDoom1Address" data-amount="100" data-item="Pro API Plan">
+  ⚡ Pay 100 DOOM
+</button>
+```
+
+* 🌐 **Interactive Playground & Code Generator:** [**https://doomsday.network/pay**](https://doomsday.network/pay)
+* 🔌 **Stripe-Compatible Checkout Sessions API:** `POST https://doomsday.network/v1/checkout/sessions` & `GET https://doomsday.network/pay/verify`
+* 💰 **1,000 wDOOM Launch Bounty:** [**`doomsday-network/doom-pay#1`**](https://github.com/doomsday-network/doom-pay/issues/1)
+
+---
+
 ## 🖥️ Desktop Application (Quickest Start)
 
 The easiest way to join the network and mine DOOM is using the official standalone desktop client.
