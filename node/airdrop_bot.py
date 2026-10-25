@@ -311,14 +311,21 @@ def _get_latest_base_transfer_tx(evm_wallet: str) -> Optional[str]:
 
 def _has_starred_repo(user: str, headers: Dict[str, str]) -> bool:
     try:
-        req = urllib.request.Request(
-            "https://api.github.com/repos/doomsday-network/doomsday/stargazers?per_page=100",
-            headers=headers,
-        )
-        stars = json.loads(urllib.request.urlopen(req, timeout=10).read().decode())
-        return any((s.get("login") or "").lower() == user.lower() for s in stars)
+        for page in range(1, 6):
+            req = urllib.request.Request(
+                f"https://api.github.com/repos/doomsday-network/doomsday/stargazers?per_page=100&page={page}",
+                headers=headers,
+            )
+            stars = json.loads(urllib.request.urlopen(req, timeout=10).read().decode())
+            if not isinstance(stars, list) or not stars:
+                break
+            if any((s.get("login") or "").lower() == user.lower() for s in stars):
+                return True
+            if len(stars) < 100:
+                break
     except Exception:
-        return False
+        pass
+    return False
 
 
 def _has_forked_repo(user: str, headers: Dict[str, str]) -> bool:
@@ -540,6 +547,8 @@ def poll_once(gh_token: str) -> None:
             if repo == "doomsday-network/doomsday" and issue_num == 2:
                 if not (_has_starred_repo(user, headers) or bool(comment_doom_addrs)):
                     print(f"[AirdropBot] Waiting for @{user} to star repo or include doom1 address on #2")
+                    if cid in state["processed_comments"]:
+                        state["processed_comments"].remove(cid)
                     _save_state(state)
                     continue
 
