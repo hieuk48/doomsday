@@ -389,12 +389,18 @@ def get_pool_leaderboard():
             blocks_by_solver[s] = blocks_by_solver.get(s, 0) + 1
 
     entries = []
+    mempool_spent = chain.get_mempool_spent_outpoints()
+    onchain_balances: Dict[str, int] = {}
+    for outpoint, (rcpt, amt) in chain.utxo_set.items():
+        if outpoint not in mempool_spent:
+            onchain_balances[rcpt] = onchain_balances.get(rcpt, 0) + amt
+
     for addr in all_addrs:
         if not addr or not addr.startswith("doom1"):
             continue
         paid = pool.total_paid_sparks.get(addr, 0)
         unpaid = pool.unpaid_sparks.get(addr, 0)
-        onchain_sparks = chain.get_balance(addr)
+        onchain_sparks = onchain_balances.get(addr, 0)
         total_doom = round(max(paid + unpaid, onchain_sparks + unpaid) / COIN, 2)
         r_shares = pool.round_shares.get(addr, 0)
         matching_w = [w for w in pool.workers.values() if w.address == addr and (now - w.last_share_time < 120)]

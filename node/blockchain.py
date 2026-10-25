@@ -1,3 +1,4 @@
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -23,7 +24,7 @@ class Blockchain:
         self._load_or_genesis()
 
     def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS blocks (
@@ -37,7 +38,7 @@ class Blockchain:
             conn.commit()
 
     def _load_or_genesis(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT height, hash, header_json, txs_json FROM blocks ORDER BY height ASC")
             rows = cursor.fetchall()
@@ -111,6 +112,9 @@ class Blockchain:
             now_ts = int(timestamp)
         else:
             now_ts = max(tip.header.timestamp + 1, int(time.time()))
+        if cache and not self.mempool and (miner_address, height, now_ts) in self.active_templates:
+            return self.active_templates[(miner_address, height, now_ts)]
+
         bits = self.get_next_bits(current_timestamp=now_ts)
         target = bits_to_target(bits)
         reward = get_block_reward(height)
@@ -119,24 +123,28 @@ class Blockchain:
         txs_to_include = list(self.mempool)
         tx_fees = 0
         valid_txs = []
-        temp_utxos = dict(self.utxo_set)
-
-        for tx in txs_to_include:
-            total_in = 0
-            valid = True
-            for inp in tx.inputs:
-                key = f"{inp.txid}:{inp.vout}"
-                if key not in temp_utxos:
-                    valid = False
-                    break
-                total_in += temp_utxos[key][1]
-            if valid:
-                total_out = sum(o.amount for o in tx.outputs)
-                if total_in >= total_out:
-                    tx_fees += (total_in - total_out)
-                    for inp in tx.inputs:
-                        del temp_utxos[f"{inp.txid}:{inp.vout}"]
-                    valid_txs.append(tx)
+        if txs_to_include:
+            temp_utxos = dict(self.utxo_set)
+            stale_txids = set()
+            for tx in txs_to_include:
+                total_in = 0
+                valid = True
+                for inp in tx.inputs:
+                    key = f"{inp.txid}:{inp.vout}"
+                    if key not in temp_utxos:
+                        valid = False
+                        stale_txids.add(tx.txid)
+                        break
+                    total_in += temp_utxos[key][1]
+                if valid:
+                    total_out = sum(o.amount for o in tx.outputs)
+                    if total_in >= total_out:
+                        tx_fees += (total_in - total_out)
+                        for inp in tx.inputs:
+                            del temp_utxos[f"{inp.txid}:{inp.vout}"]
+                        valid_txs.append(tx)
+            if stale_txids:
+                self.mempool = [t for t in self.mempool if t.txid not in stale_txids]
 
         coinbase = create_coinbase_tx(
             recipient=miner_address,
@@ -228,7 +236,7 @@ class Blockchain:
             return False, f"Consensus check failed: {reason}"
 
         # Commit to ledger
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             self._save_block_to_db(block, conn)
 
         self.blocks.append(block)
@@ -261,7 +269,7 @@ class Blockchain:
         if not ok:
             return False, f"Consensus check failed: {reason}"
 
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             self._save_block_to_db(block, conn)
 
         self.blocks.append(block)
@@ -320,7 +328,7 @@ class Blockchain:
                 for vout, out in enumerate(tx.outputs):
                     temp_utxos[f"{tx.txid}:{vout}"] = (out.recipient, out.amount)
 
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM blocks WHERE height >= ?", (fork_height,))
             for cand in temp_blocks[fork_height:]:
