@@ -3,6 +3,13 @@ import asyncio
 import json
 import os
 import time
+try:
+    import resource
+    _soft, _hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if _soft < 65536:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (min(65536, _hard), _hard))
+except Exception:
+    pass
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Header, Depends, Request
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, PlainTextResponse, Response

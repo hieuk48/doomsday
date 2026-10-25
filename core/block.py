@@ -97,11 +97,11 @@ class BlockHeader:
 
 
 class Block:
-    def __init__(self, header: BlockHeader, transactions: List[Transaction], height: int = 0):
+    def __init__(self, header: BlockHeader, transactions: List[Transaction], height: int = 0, block_hash: Optional[str] = None):
         self.header = header
         self.transactions = transactions
         self.height = height
-        self.hash = self.header.calculate_hash()
+        self.hash = block_hash if block_hash is not None else self.header.calculate_hash()
 
     def update_hash(self):
         self.hash = self.header.calculate_hash()

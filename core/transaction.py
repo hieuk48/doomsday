@@ -59,14 +59,15 @@ class Transaction:
         outputs: List[TxOutput],
         timestamp: Optional[int] = None,
         is_coinbase: bool = False,
-        extra_data: str = ""
+        extra_data: str = "",
+        txid: Optional[str] = None
     ):
         self.inputs = inputs
         self.outputs = outputs
         self.timestamp = timestamp if timestamp is not None else int(time.time())
         self.is_coinbase = is_coinbase
         self.extra_data = extra_data
-        self.txid = self.calculate_txid()
+        self.txid = txid if txid is not None else self.calculate_txid()
 
     def calculate_txid(self) -> str:
         """Calculate canonical TXID hash."""
@@ -113,16 +114,15 @@ class Transaction:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Transaction':
-        tx = cls(
+    def from_dict(cls, data: Dict[str, Any], trust_cached: bool = False) -> 'Transaction':
+        return cls(
             inputs=[TxInput.from_dict(i) for i in data["inputs"]],
             outputs=[TxOutput.from_dict(o) for o in data["outputs"]],
             timestamp=data["timestamp"],
             is_coinbase=data.get("is_coinbase", False),
-            extra_data=data.get("extra_data", "")
+            extra_data=data.get("extra_data", ""),
+            txid=data.get("txid") if trust_cached else None
         )
-        tx.txid = data.get("txid", tx.calculate_txid())
-        return tx
 
 
 def create_coinbase_tx(

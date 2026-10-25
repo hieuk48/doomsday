@@ -54,9 +54,8 @@ class Blockchain:
                 for row in rows:
                     height, b_hash, h_json, t_json = row
                     header = BlockHeader.from_dict(json.loads(h_json))
-                    txs = [Transaction.from_dict(t) for t in json.loads(t_json)]
-                    b = Block(header=header, transactions=txs, height=height)
-                    b.hash = b_hash
+                    txs = [Transaction.from_dict(t, trust_cached=True) for t in json.loads(t_json)]
+                    b = Block(header=header, transactions=txs, height=height, block_hash=b_hash)
                     self.blocks.append(b)
                     self._apply_block_utxos(b)
                 print(f"[Blockchain] Loaded {len(self.blocks)} blocks from database. Tip height: {self.get_tip().height}")
