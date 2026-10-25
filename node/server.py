@@ -208,9 +208,9 @@ async def broadcast_event(event_type: str, data: Any):
     """Broadcast real-time updates to all connected web dashboards."""
     dead_sockets = []
     message = json.dumps({"type": event_type, "data": data})
-    for ws in connected_sockets:
+    for ws in list(connected_sockets):
         try:
-            await ws.send_text(message)
+            await asyncio.wait_for(ws.send_text(message), timeout=1.0)
         except Exception:
             dead_sockets.append(ws)
     for ws in dead_sockets:
@@ -1799,7 +1799,7 @@ def start_server(host: str = "0.0.0.0", port: int = 8334, peers: Optional[List[s
     else:
         print(f"Exchange RPC Auth: DISABLED (Set DOOMSDAY_EXCHANGE_KEY or --exchange-key to enable)")
     print(f"=======================================================\n")
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    uvicorn.run(app, host=host, port=port, log_level="warning", timeout_graceful_shutdown=3)
 
 
 if __name__ == '__main__':

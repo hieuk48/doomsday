@@ -294,6 +294,8 @@ class Blockchain:
             return False, f"Reorg depth exceeds finality guard ({max_reorg_depth} blocks)"
         if candidate_blocks[-1].height <= tip.height:
             return False, "Candidate branch is not longer than local chain"
+        if candidate_blocks[0].header.prev_hash != self.blocks[fork_height - 1].hash:
+            return False, f"Reorg parent mismatch at #{fork_height}"
 
         temp_blocks = list(self.blocks[:fork_height])
         temp_utxos: Dict[str, Tuple[str, int]] = {}

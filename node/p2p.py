@@ -180,27 +180,26 @@ class P2PManager:
                             fork_h = max(1, b.height - 6)
                             r_resp = await client.get(
                                 f"{peer.url}/p2p/blocks",
-                                params={"start_height": fork_h, "limit": 25},
-                                timeout=15.0
+                                params={"start_height": fork_h, "limit": 12},
+                                timeout=8.0
                             )
                             if r_resp.status_code == 200:
                                 r_blocks = [Block.from_dict(rb) for rb in r_resp.json()]
-                                for idx_r in range(len(r_blocks)):
-                                    cand_sub = r_blocks[idx_r:]
-                                    if cand_sub and cand_sub[0].height >= 1:
-                                        r_ok, _ = self.chain.reorg_chain(cand_sub[0].height, cand_sub)
-                                        if r_ok:
-                                            accepted_count += len(cand_sub)
-                                            break
-                                else:
-                                    print(f"[P2P Sync] Block #{b.height} reorg failed: {msg}")
-                                    self.is_syncing = False
-                                    return
-                                break
+                                if r_blocks and r_blocks[0].height >= 1:
+                                    r_ok, _ = self.chain.reorg_chain(r_blocks[0].height, r_blocks)
+                                    if r_ok:
+                                        accepted_count += len(r_blocks)
+                            break
                         elif "already in ledger" not in msg:
                             print(f"[P2P Sync] Block #{b.height} verification failed: {msg}")
                             self.is_syncing = False
                             return
+
+                    if accepted_count == 0:
+                        print(f"[P2P Sync] Zero blocks accepted from peer [{peer.address}]; aborting sync.")
+                        if peer.address not in self.seeds:
+                            self.peers.pop(peer.address, None)
+                        break
 
                     print(f"[P2P Sync] Downloaded and committed {accepted_count} blocks (New Tip: #{self.chain.get_tip().height})")
                     if len(raw_blocks) < limit:
