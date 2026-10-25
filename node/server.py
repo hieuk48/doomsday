@@ -523,13 +523,12 @@ async def p2p_handshake(req: P2PHandshakeRequest, request: Request):
         client_ip = forwarded.split(",")[0].strip()
 
     caller_addr = f"{client_ip}:{req.listen_port}"
-    if req.node_id != p2p.node_id:
+    if req.node_id != p2p.node_id and len(p2p.peers) < 32 and client_ip not in ("127.0.0.1", "localhost"):
         peer = p2p.register_peer(caller_addr)
         peer.node_id = req.node_id
         peer.height = req.height
         peer.tip_hash = req.tip_hash
         peer.last_seen = time.time()
-        peer.is_connected = True
 
     tip = chain.get_tip()
     return {

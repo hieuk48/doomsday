@@ -77,7 +77,10 @@ class P2PManager:
 
     async def get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=8.0)
+            self._client = httpx.AsyncClient(
+                timeout=3.0,
+                limits=httpx.Limits(max_connections=15, max_keepalive_connections=5)
+            )
         return self._client
 
     def register_peer(self, address: str) -> Peer:
@@ -129,6 +132,8 @@ class P2PManager:
                 return True
         except Exception:
             peer.is_connected = False
+            if peer_addr not in self.seeds:
+                self.peers.pop(peer_addr, None)
         return False
 
     async def sync_chain(self, peer_addr: str):
@@ -209,32 +214,34 @@ class P2PManager:
             self.is_syncing = False
             print(f"[P2P Sync] Synchronization complete. Local ledger tip: #{self.chain.get_tip().height}")
 
+    async def _safe_post(self, peer: Peer, endpoint: str, payload: Dict[str, Any]):
+        try:
+            client = await self.get_client()
+            resp = await client.post(f"{peer.url}{endpoint}", json=payload, timeout=3.0)
+            if resp.status_code != 200:
+                peer.is_connected = False
+        except Exception:
+            peer.is_connected = False
+            if peer.address not in self.seeds:
+                self.peers.pop(peer.address, None)
+
     async def broadcast_block(self, block: Block, origin_peer: Optional[str] = None):
         """Gossip newly discovered block to all active peers in the mesh."""
         self.seen_blocks.add(block.hash)
-        client = await self.get_client()
         payload = {"block": block.to_dict()}
 
-        active_peers = [p for p in self.peers.values() if p.is_connected and p.address != origin_peer]
+        active_peers = [p for p in list(self.peers.values()) if p.is_connected and p.address != origin_peer]
         for peer in active_peers:
-            try:
-                # Fire and forget POST
-                asyncio.create_task(client.post(f"{peer.url}/p2p/block", json=payload, timeout=4.0))
-            except Exception:
-                pass
+            asyncio.create_task(self._safe_post(peer, "/p2p/block", payload))
 
     async def broadcast_tx(self, tx: Transaction, origin_peer: Optional[str] = None):
         """Gossip newly submitted transaction to all active peers in the mesh."""
         self.seen_txs.add(tx.txid)
-        client = await self.get_client()
         payload = {"transaction": tx.to_dict()}
 
-        active_peers = [p for p in self.peers.values() if p.is_connected and p.address != origin_peer]
+        active_peers = [p for p in list(self.peers.values()) if p.is_connected and p.address != origin_peer]
         for peer in active_peers:
-            try:
-                asyncio.create_task(client.post(f"{peer.url}/p2p/tx", json=payload, timeout=4.0))
-            except Exception:
-                pass
+            asyncio.create_task(self._safe_post(peer, "/p2p/tx", payload))
 
     async def run_maintenance_loop(self):
         """Periodic background task: ping peers, maintain active topology, sync tips."""
